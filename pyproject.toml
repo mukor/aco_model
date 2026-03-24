@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aco-model"
+version = "0.1.0"
+description = "Game economic model with web and curses interfaces"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24.0",
+    "pandas>=2.0.0",
+    "pydantic>=2.0.0",
+    "pyyaml>=6.0",
+    "typer>=0.9.0",
+    "rich>=13.0.0",
+]
+
+[project.optional-dependencies]
+web = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.20.0",
+]
+curses = []
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "ruff>=0.4.0",
+]
+notebook = [
+    "jupyter>=1.0.0",
+    "matplotlib>=3.7.0",
+]
+
+[project.scripts]
+aco = "aco_model.cli:app"
