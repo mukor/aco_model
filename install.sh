@@ -2,11 +2,17 @@
 set -euo pipefail
 
 # ACO Model installer for macOS and Linux
-# Usage: curl -sSL <raw-url>/install.sh | bash
-#    or: ./install.sh
+#
+# Usage:
+#   ./install.sh                  # clone into current directory
+#   ./install.sh ~/projects/aco   # clone into specified directory
+#
+# Remote one-liner:
+#   bash <(curl -sSL https://raw.githubusercontent.com/mukor/aco_model/main/install.sh)
+#   bash <(curl -sSL https://raw.githubusercontent.com/mukor/aco_model/main/install.sh) ~/my/path
 
 REPO_URL="${ACO_REPO_URL:-git@github.com:mukor/aco_model.git}"
-INSTALL_DIR="${ACO_INSTALL_DIR:-$HOME/dev/aco_model}"
+INSTALL_DIR="${1:-${ACO_INSTALL_DIR:-$(pwd)/aco_model}}"
 VENV_NAME="aco_model"
 PYTHON_MIN="3.10"
 
@@ -28,8 +34,6 @@ fail()  { echo -e "${RED}[error]${NC} $1"; exit 1; }
 find_python() {
     for cmd in python3 python; do
         if command -v "$cmd" &>/dev/null; then
-            local ver
-            ver=$("$cmd" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
             if "$cmd" -c "import sys; exit(0 if sys.version_info >= (3,10) else 1)" 2>/dev/null; then
                 echo "$cmd"
                 return 0
@@ -66,14 +70,17 @@ fi
 
 # ── Clone or update repo ─────────────────────────────────────────────────
 
+info "Install directory: $INSTALL_DIR"
+
 if [ -d "$INSTALL_DIR/.git" ]; then
-    info "Repository exists at $INSTALL_DIR, pulling latest..."
+    info "Repository exists, pulling latest..."
     git -C "$INSTALL_DIR" pull --ff-only || warn "Pull failed — continuing with existing code"
     ok "Updated"
-elif [ -d "$INSTALL_DIR" ]; then
-    fail "$INSTALL_DIR exists but is not a git repo. Remove it or set ACO_INSTALL_DIR."
+elif [ -d "$INSTALL_DIR" ] && [ "$(ls -A "$INSTALL_DIR" 2>/dev/null)" ]; then
+    fail "$INSTALL_DIR exists and is not empty. Remove it or choose a different path."
 else
     info "Cloning to $INSTALL_DIR..."
+    mkdir -p "$(dirname "$INSTALL_DIR")"
     git clone "$REPO_URL" "$INSTALL_DIR"
     ok "Cloned"
 fi
@@ -132,7 +139,7 @@ else
 fi
 echo ""
 echo "  Quick start:"
-echo "    aco simulate          # run retention simulation"
-echo "    aco revenue           # estimate revenue"
+echo "    aco simulate           # run retention simulation"
+echo "    aco revenue            # estimate revenue"
 echo "    jupyter lab notebooks/ # interactive notebooks"
 echo ""

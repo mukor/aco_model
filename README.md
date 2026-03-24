@@ -7,12 +7,27 @@ Simulates player retention, DAU projections, and revenue estimates with interact
 ## Requirements
 
 - Python 3.10+
-- [virtualenvwrapper](https://virtualenvwrapper.readthedocs.io/)
+- git
+- [virtualenvwrapper](https://virtualenvwrapper.readthedocs.io/) (recommended, falls back to venv)
 
-## Setup
+## Quick Install
+
+One-liner — clones into the current directory and sets everything up:
 
 ```bash
-git clone <repo-url> && cd aco_model
+bash <(curl -sSL https://raw.githubusercontent.com/mukor/aco_model/main/install.sh)
+```
+
+Or specify an install directory:
+
+```bash
+bash <(curl -sSL https://raw.githubusercontent.com/mukor/aco_model/main/install.sh) ~/dev/aco_model
+```
+
+## Manual Setup
+
+```bash
+git clone git@github.com:mukor/aco_model.git && cd aco_model
 mkvirtualenv -p python3 aco_model
 pip install -e ".[dev,notebook]"
 setvirtualenvproject
