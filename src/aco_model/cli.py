@@ -104,6 +104,56 @@ def revenue(
 
 
 @app.command()
+def economy(
+    config_path: Path = typer.Option("config.yaml", "--config", "-c", help="Config file path"),
+    output: Path = typer.Option("output/economy_sim.csv", "--output", "-o", help="CSV output path"),
+):
+    """Simulate currency flows across the game economy."""
+    from aco_model.economy import simulate_economy
+    from aco_model.retention import load_installs, simulate as run_sim
+
+    cfg = load_config(config_path)
+    installs = load_installs(cfg.installs_path)
+    sim = run_sim(installs, cfg.retention, cfg.sim_days)
+    econ = simulate_economy(sim, cfg.economy)
+    results = econ.to_dataframe()
+
+    # Write CSV
+    output.parent.mkdir(parents=True, exist_ok=True)
+    results.to_csv(output, index=False)
+    console.print(f"\n[dim]Results written to {output}[/dim]\n")
+
+    # Instance economics
+    console.print("[bold]Instance Economics (per run)[/bold]")
+    ie = econ.instance_economics_dataframe()
+    ie_table = Table()
+    for col in ie.columns:
+        ie_table.add_column(col, justify="right")
+    for _, row in ie.iterrows():
+        ie_table.add_row(*[str(row[c]) for c in ie.columns])
+    console.print(ie_table)
+
+    # Key card progression
+    console.print("\n[bold]Key Card Progression[/bold]")
+    kc = econ.keycard_progression_dataframe()
+    kc_table = Table()
+    for col in kc.columns:
+        kc_table.add_column(col, justify="right")
+    for _, row in kc.iterrows():
+        kc_table.add_row(*[str(row[c]) for c in kc.columns])
+    console.print(kc_table)
+
+    # Summary
+    df = results
+    console.print(f"\n[bold]Day {cfg.sim_days} Summary:[/bold]")
+    console.print(f"  DAU: {df.iloc[-1]['dau']:,}")
+    console.print(f"  Nuts balance: {df.iloc[-1]['nuts_balance']:,}")
+    console.print(f"  Scrap balance: {df.iloc[-1]['scrap_balance']:,}")
+    console.print(f"  Keycards consumed (total): {df['keycards_consumed'].sum():,}")
+    console.print(f"  Battle Pass revenue: ${econ.battle_pass_total_revenue:,.2f}")
+
+
+@app.command()
 def status():
     """Show current simulation status."""
     console.print("No simulation running.")
