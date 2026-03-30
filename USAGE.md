@@ -121,13 +121,41 @@ Revenue projections built on the DAU simulation. Loads retention/DAU from shared
 
 ## Tests
 
+### Running Tests
+
 ```bash
-pytest           # run all tests (88)
-pytest -v        # verbose output
-pytest tests/test_retention.py      # retention tests
-pytest tests/test_monetization.py   # monetization tests
-pytest tests/test_state.py          # shared state tests
-pytest tests/test_config.py         # config tests
+pytest                    # run all tests (114 unit + 3 notebook smoke)
+pytest -m "not slow"      # fast — unit tests only (114 tests, <1s)
+pytest -m slow            # notebook smoke tests only (3 tests, ~10s)
+pytest -v                 # verbose output
+```
+
+### Test Modules
+
+| Module | Tests | What it covers |
+|--------|-------|----------------|
+| `tests/test_retention.py` | 49 | Retention curve, install loading, SimResult, cohort matrix |
+| `tests/test_monetization.py` | 29 | MonetizationParams, RevenueResult, ARPDAU, cohort revenue |
+| `tests/test_economy.py` | 23 | EconomyParams, currency flows, instance economics, keycard progression |
+| `tests/test_config.py` | 11 | Config loading, YAML parsing, defaults, monetization config |
+| `tests/test_state.py` | 10 | Shared state save/load roundtrip, DAU preservation |
+| `tests/test_notebooks.py` | 3 | Headless execution of all notebooks (marked `slow`) |
+
+### Notebook Smoke Tests
+
+The notebook tests (`tests/test_notebooks.py`) run each notebook headless via `jupyter nbconvert --execute` and verify no cells throw exceptions. This catches:
+
+- Import errors
+- Missing variables from cells run out of order
+- Wrong function signatures
+- Config/data loading failures
+
+Notebooks detect headless mode via `ACO_HEADLESS=1` env var (set by the test). In headless mode, plot functions are called directly instead of through widget bindings, avoiding widget event loop hangs.
+
+To run just the notebook tests:
+
+```bash
+pytest tests/test_notebooks.py -v
 ```
 
 ## Output Files
@@ -138,4 +166,5 @@ All generated output goes to the `output/` directory:
 |------|-------------|
 | `output/retention_sim.csv` | `aco simulate` |
 | `output/revenue_estimate.csv` | `aco revenue` |
+| `output/economy_sim.csv` | `aco economy` |
 | `output/state.json` | Notebook sliders (shared state) |
