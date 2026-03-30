@@ -21,6 +21,7 @@ class EconomyResult:
         n_tiers = len(params.instance_tiers)
         avg_nuts_per_run = np.mean([t.nuts_earned for t in params.instance_tiers])
         avg_scrap_per_run = np.mean([t.scrap_earned for t in params.instance_tiers])
+        avg_coins_per_run = np.mean([t.coins_earned for t in params.instance_tiers])
         avg_keycard_return = np.mean([t.keycard_drop_chance for t in params.instance_tiers])
 
         # ── Nuts ──────────────────────────────────────────────────────────
@@ -35,7 +36,8 @@ class EconomyResult:
         # Each run consumes 1 keycard, minus the chance of getting one back.
         # Net keycards consumed drives merge demand.
         net_cards_consumed = runs_per_day * (1.0 - avg_keycard_return)
-        avg_merge_cost = np.mean([t.merge_cost_nuts for t in params.keycard_tiers if t.merge_cost_nuts > 0])
+        merge_costs = [t.merge_cost_nuts for t in params.keycard_tiers if t.merge_cost_nuts > 0]
+        avg_merge_cost = np.mean(merge_costs) if merge_costs else 0.0
         # Fraction of cards that need merging (assume ~50% need to be merged up)
         merge_fraction = 0.5
         self._nuts_spent = net_cards_consumed * merge_fraction * avg_merge_cost / n_tiers
@@ -50,12 +52,11 @@ class EconomyResult:
         self._scrap_spent = runs_per_day * buff_cost_per_run
 
         # ── Coins ─────────────────────────────────────────────────────────
-        # In: IAP purchases (from monetization layer, approximated here)
-        # We don't double-count with monetization — just model BP flow
-        self._coins_in_bp = bp_buyers * bp.cost_coins / bp.season_days  # amortized daily
+        # Earned from instances
+        self._coins_earned_instances = runs_per_day * avg_coins_per_run
 
-        # Out: Battle Pass purchase (same as in, it's a wash)
-        # Coins returned to completers
+        # BP flow
+        self._coins_in_bp = bp_buyers * bp.cost_coins / bp.season_days  # amortized daily
         bp_completers = bp_buyers * bp.completion_rate
         self._coins_returned_bp = bp_completers * bp.coins_returned / bp.season_days
 
@@ -90,6 +91,11 @@ class EconomyResult:
     def scrap_balance(self) -> np.ndarray:
         """Cumulative net scrap in the system."""
         return np.cumsum(self._scrap_earned - self._scrap_spent)
+
+    @property
+    def daily_coins_earned(self) -> np.ndarray:
+        """Coins earned from instance runs."""
+        return self._coins_earned_instances
 
     @property
     def daily_coins_from_bp(self) -> np.ndarray:

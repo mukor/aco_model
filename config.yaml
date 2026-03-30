@@ -6,28 +6,36 @@ retention:
   - [30, 6.0]
   - [90, 1.5]
   - [180, 0.0]
-monetization: {pct_payers: 0.03, arppu: 1.5}
+monetization: {pct_payers: 0.04, arppu: 9.499999999999998}
 economy:
-  instances_per_day: 3
+  instances_per_day: 1
   coin_to_usd: 1.0
-  buff_cost_scrap: 50
-  upgrade_cost_scrap: 100
+  buff_cost_scrap: 0.0
+  upgrade_cost_scrap: 100.0
   buffs_per_run: 1.0
   outfit_price_usd: 7.0
   character_price_usd: 20.0
   instance_tiers:
-  - {name: common, nuts_earned: 30, scrap_earned: 50, keycard_drop_chance: 0.1}
-  - {name: uncommon, nuts_earned: 60, scrap_earned: 100, keycard_drop_chance: 0.08}
-  - {name: rare, nuts_earned: 100, scrap_earned: 175, keycard_drop_chance: 0.06}
-  - {name: epic, nuts_earned: 150, scrap_earned: 275, keycard_drop_chance: 0.04}
-  - {name: legendary, nuts_earned: 225, scrap_earned: 400, keycard_drop_chance: 0.02}
+  - {name: common, nuts_earned: 50.0, scrap_earned: 100.0, coins_earned: 0.01, gear_value_usd: 0.025,
+    keycard_drop_chance: 0.0}
+  - {name: uncommon, nuts_earned: 70.0, scrap_earned: 200.0, coins_earned: 0.02, gear_value_usd: 0.25,
+    keycard_drop_chance: 0.0}
+  - {name: rare, nuts_earned: 100.0, scrap_earned: 300.0, coins_earned: 0.75, gear_value_usd: 0.5,
+    keycard_drop_chance: 0.0}
+  - {name: epic, nuts_earned: 200.0, scrap_earned: 400.0, coins_earned: 1.5, gear_value_usd: 2.0,
+    keycard_drop_chance: 0.0}
+  - {name: legendary, nuts_earned: 400.0, scrap_earned: 500.0, coins_earned: 3.5,
+    gear_value_usd: 5.0, keycard_drop_chance: 0.0}
   keycard_tiers:
-  - {name: bronze, cards_required: 0, merge_cost_nuts: 0, instance_tier: common}
-  - {name: silver, cards_required: 2, merge_cost_nuts: 100, instance_tier: uncommon}
-  - {name: gold, cards_required: 4, merge_cost_nuts: 200, instance_tier: rare}
-  - {name: mithril, cards_required: 8, merge_cost_nuts: 400, instance_tier: epic}
-  - {name: vibranium, cards_required: 16, merge_cost_nuts: 800, instance_tier: legendary}
-  battle_pass: {cost_coins: 5.0, season_days: 60, coins_returned: 5.0, nuts_reward_total: 500,
-    scrap_reward_total: 1000, keycards_rewarded: 10, completion_rate: 0.3, purchase_rate: 0.1}
+  - {name: bronze, cards_required: 0, merge_cost_nuts: 0.0, instance_tier: common}
+  - {name: silver, cards_required: 2, merge_cost_nuts: 0.0, instance_tier: uncommon}
+  - {name: gold, cards_required: 2, merge_cost_nuts: 0.0, instance_tier: rare}
+  - {name: mithril, cards_required: 2, merge_cost_nuts: 0.0, instance_tier: epic}
+  - {name: vibranium, cards_required: 2, merge_cost_nuts: 0.0, instance_tier: legendary}
+  battle_pass: {cost_coins: 5.0, season_days: 60, coins_returned: 5.0, nuts_reward_total: 500.0,
+    scrap_reward_total: 1000.0, keycards_rewarded: 10, completion_rate: 0.3, purchase_rate: 0.12}
+  bronze_coin_cost: 1.0
+  nut_value_usd: 0.01
+  scrap_value_usd: 0.005
 installs_path: data/installs.txt
 sim_days: 90

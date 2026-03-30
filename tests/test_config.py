@@ -58,8 +58,11 @@ class TestConfig:
         # Retention should still have defaults
         assert len(config.retention.anchors) == 6
 
-    def test_default_monetization(self):
-        config = load_config()
+    def test_default_monetization(self, tmp_path):
+        """Test that missing monetization section uses model defaults."""
+        cfg_path = tmp_path / "test.yaml"
+        cfg_path.write_text("sim_days: 90\n")
+        config = load_config(cfg_path)
         assert isinstance(config.monetization, MonetizationParams)
         assert config.monetization.pct_payers == 0.03
         assert config.monetization.arppu == 1.50
