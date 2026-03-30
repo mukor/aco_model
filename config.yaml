@@ -4,7 +4,7 @@ retention:
   - [1, 48.0]
   - [7, 26.0]
   - [30, 6.0]
-  - [90, 1.6]
+  - [90, 1.5]
   - [180, 0.0]
 monetization: {pct_payers: 0.03, arppu: 1.5}
 economy:
