@@ -78,19 +78,19 @@ class EconomyParams(BaseModel):
     character_price_usd: float = Field(default=20.0, gt=0, description="Character skin price (VR baseline)")
 
     instance_tiers: list[InstanceTier] = Field(default_factory=lambda: [
-        InstanceTier(name="bronze",    nuts_earned=30,  scrap_earned=50,  keycard_drop_chance=0.10),
-        InstanceTier(name="silver",    nuts_earned=60,  scrap_earned=100, keycard_drop_chance=0.08),
-        InstanceTier(name="gold",      nuts_earned=100, scrap_earned=175, keycard_drop_chance=0.06),
-        InstanceTier(name="mithril",   nuts_earned=150, scrap_earned=275, keycard_drop_chance=0.04),
-        InstanceTier(name="vibranium", nuts_earned=225, scrap_earned=400, keycard_drop_chance=0.02),
+        InstanceTier(name="common",    nuts_earned=30,  scrap_earned=50,  keycard_drop_chance=0.10),
+        InstanceTier(name="uncommon",  nuts_earned=60,  scrap_earned=100, keycard_drop_chance=0.08),
+        InstanceTier(name="rare",      nuts_earned=100, scrap_earned=175, keycard_drop_chance=0.06),
+        InstanceTier(name="epic",      nuts_earned=150, scrap_earned=275, keycard_drop_chance=0.04),
+        InstanceTier(name="legendary", nuts_earned=225, scrap_earned=400, keycard_drop_chance=0.02),
     ])
 
     keycard_tiers: list[KeyCardTier] = Field(default_factory=lambda: [
-        KeyCardTier(name="common",    cards_required=0,  merge_cost_nuts=0,   instance_tier="bronze"),
-        KeyCardTier(name="uncommon",  cards_required=2,  merge_cost_nuts=100, instance_tier="silver"),
-        KeyCardTier(name="rare",      cards_required=4,  merge_cost_nuts=200, instance_tier="gold"),
-        KeyCardTier(name="epic",      cards_required=8,  merge_cost_nuts=400, instance_tier="mithril"),
-        KeyCardTier(name="legendary", cards_required=16, merge_cost_nuts=800, instance_tier="vibranium"),
+        KeyCardTier(name="bronze",    cards_required=0,  merge_cost_nuts=0,   instance_tier="common"),
+        KeyCardTier(name="silver",    cards_required=2,  merge_cost_nuts=100, instance_tier="uncommon"),
+        KeyCardTier(name="gold",      cards_required=4,  merge_cost_nuts=200, instance_tier="rare"),
+        KeyCardTier(name="mithril",   cards_required=8,  merge_cost_nuts=400, instance_tier="epic"),
+        KeyCardTier(name="vibranium", cards_required=16, merge_cost_nuts=800, instance_tier="legendary"),
     ])
 
     battle_pass: BattlePassParams = Field(default_factory=BattlePassParams)

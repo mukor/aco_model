@@ -44,12 +44,12 @@ class TestEconomyParams:
     def test_instance_tier_names(self):
         params = EconomyParams()
         names = [t.name for t in params.instance_tiers]
-        assert names == ["bronze", "silver", "gold", "mithril", "vibranium"]
+        assert names == ["common", "uncommon", "rare", "epic", "legendary"]
 
     def test_keycard_tier_names(self):
         params = EconomyParams()
         names = [t.name for t in params.keycard_tiers]
-        assert names == ["common", "uncommon", "rare", "epic", "legendary"]
+        assert names == ["bronze", "silver", "gold", "mithril", "vibranium"]
 
     def test_keycard_merge_costs_escalate(self):
         params = EconomyParams()
