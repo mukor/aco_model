@@ -7,7 +7,7 @@ import pytest
 from aco_model.models import (
     BattlePassParams, EconomyParams, InstanceTier, KeyCardTier, RetentionCurve,
 )
-from aco_model.economy import EconomyResult, simulate_economy
+from aco_model.economy import EconomyResult, simulate_economy, simulate_player_progression
 from aco_model.retention import load_installs, simulate
 
 
@@ -61,7 +61,7 @@ class TestEconomyParams:
         params = EconomyParams()
         bp = params.battle_pass
         assert bp.cost_coins == 5.0
-        assert bp.season_days == 60
+        assert bp.season_days == 90
         assert bp.coins_returned == 5.0
         assert bp.completion_rate == 0.3
 
@@ -175,3 +175,98 @@ class TestEconomyDataFrames:
         assert "cumulative_nuts" in df.columns
         # Cumulative costs should increase
         assert df.iloc[-1]["cumulative_nuts"] > df.iloc[0]["cumulative_nuts"]
+
+
+# ── Player Progression ────────────────────────────────────────────────────
+
+class TestPlayerProgression:
+    def test_returns_dataframe(self, default_params):
+        df = simulate_player_progression(default_params, max_player_days=10)
+        assert isinstance(df, pd.DataFrame)
+        assert len(df) == 10 * default_params.instances_per_day
+
+    def test_starts_with_seed_currency(self, default_params):
+        df = simulate_player_progression(default_params, max_player_days=1)
+        # First run earns resources on top of seed
+        first = df.iloc[0]
+        assert first["coins"] >= default_params.seed_coins
+        assert first["nuts"] >= default_params.seed_nuts
+
+    def test_starts_at_common_tier(self, default_params):
+        df = simulate_player_progression(default_params, max_player_days=1)
+        assert df.iloc[0]["instance_tier"] == "common"
+        assert df.iloc[0]["keycard_tier"] == "bronze"
+
+    def test_resources_accumulate(self, default_params):
+        df = simulate_player_progression(default_params, max_player_days=10)
+        # Cumulative earnings should increase
+        assert df.iloc[-1]["cum_nuts_earned"] > df.iloc[0]["cum_nuts_earned"]
+        assert df.iloc[-1]["cum_scrap_earned"] > df.iloc[0]["cum_scrap_earned"]
+
+    def test_xp_accumulates(self, default_params):
+        df = simulate_player_progression(default_params, max_player_days=10)
+        assert df.iloc[-1]["xp"] > df.iloc[0]["xp"]
+
+    def test_tier_up_happens(self):
+        """With enough seed nuts, player should merge up from bronze."""
+        params = EconomyParams(
+            seed_nuts=5000.0,  # plenty to merge
+            instances_per_day=3,
+        )
+        df = simulate_player_progression(params, max_player_days=30)
+        # Should have at least one tier-up
+        assert df["tier_up"].any()
+
+    def test_greedy_merge(self):
+        """Player merges as soon as they can afford it."""
+        params = EconomyParams(
+            seed_nuts=200.0,  # enough for silver merge (100 nuts, 2 bronze cards needed)
+            keycard_tiers=[
+                KeyCardTier(name="bronze", cards_required=0, merge_cost_nuts=0, instance_tier="common"),
+                KeyCardTier(name="silver", cards_required=2, merge_cost_nuts=100, instance_tier="uncommon"),
+            ],
+            instance_tiers=[
+                InstanceTier(name="common", nuts_earned=30, scrap_earned=50, keycard_drop_chance=1.0),
+                InstanceTier(name="uncommon", nuts_earned=60, scrap_earned=100, keycard_drop_chance=0.5),
+            ],
+        )
+        df = simulate_player_progression(params, max_player_days=5)
+        # With 100% keycard drop, player gets bronze cards back every run
+        # After 2 runs: has 2 bronze cards + 200 nuts seed → should merge to silver
+        tier_ups = df[df["tier_up"]]
+        assert len(tier_ups) > 0
+        # First tier-up should be early
+        assert tier_ups.iloc[0]["run"] <= 5
+
+    def test_bp_holder_earns_more(self, default_params):
+        df_no_bp = simulate_player_progression(default_params, max_player_days=30, has_battle_pass=False)
+        df_bp = simulate_player_progression(default_params, max_player_days=30, has_battle_pass=True)
+        # BP holder should have more cumulative earnings
+        assert df_bp.iloc[-1]["cum_nuts_earned"] > df_no_bp.iloc[-1]["cum_nuts_earned"]
+
+    def test_bp_complete_flag(self):
+        """BP should complete when XP reaches threshold."""
+        params = EconomyParams(
+            instances_per_day=10,
+            battle_pass=BattlePassParams(xp_to_complete=500),  # low threshold
+        )
+        df = simulate_player_progression(params, max_player_days=30, has_battle_pass=True)
+        assert df["bp_complete"].any()
+
+    def test_scrap_never_negative(self, default_params):
+        params = EconomyParams(buff_cost_scrap=9999, seed_scrap=0)
+        df = simulate_player_progression(params, max_player_days=5)
+        assert (df["scrap"] >= -0.01).all()  # small float tolerance
+
+    def test_columns_present(self, default_params):
+        df = simulate_player_progression(default_params, max_player_days=1)
+        expected = ["run", "player_day", "instance_tier", "keycard_tier",
+                    "coins", "nuts", "scrap", "xp", "tier_up", "bp_complete", "has_bp"]
+        for col in expected:
+            assert col in df.columns
+
+    def test_player_day_sequential(self, default_params):
+        df = simulate_player_progression(default_params, max_player_days=5)
+        # Player days should go 1,1,1 (3 runs/day), 2,2,2, etc.
+        assert df.iloc[0]["player_day"] == 1
+        assert df.iloc[default_params.instances_per_day]["player_day"] == 2

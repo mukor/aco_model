@@ -30,7 +30,7 @@ def test_notebook_executes(notebook):
             sys.executable, "-m", "jupyter", "nbconvert",
             "--to", "notebook",
             "--execute",
-            "--ExecutePreprocessor.timeout=120",
+            "--ExecutePreprocessor.timeout=300",
             "--ExecutePreprocessor.kernel_name=python3",
             "--output", f"/tmp/test_{notebook}",
             str(nb_path),

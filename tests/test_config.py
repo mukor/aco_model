@@ -18,8 +18,11 @@ class TestConfig:
         assert isinstance(config.retention, RetentionCurve)
         assert len(config.retention.anchors) == 6
 
-    def test_default_sim_days(self):
-        config = load_config()
+    def test_default_sim_days(self, tmp_path):
+        """Test that missing sim_days uses model default (90)."""
+        cfg_path = tmp_path / "test.yaml"
+        cfg_path.write_text("monetization: {pct_payers: 0.03, arppu: 1.5}\n")
+        config = load_config(cfg_path)
         assert config.sim_days == 90
 
     def test_default_installs_path(self):

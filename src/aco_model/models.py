@@ -35,6 +35,7 @@ class InstanceTier(BaseModel):
     nuts_earned: float = Field(ge=0, description="Nuts earned per instance run")
     scrap_earned: float = Field(ge=0, description="Scrap earned per instance run")
     coins_earned: float = Field(default=0, ge=0, description="Avg coins earned per instance run")
+    xp_earned: float = Field(default=0, ge=0, description="Avg XP earned per instance run")
     gear_value_usd: float = Field(default=0, ge=0, description="Avg USD value of gear drops per run")
     keycard_drop_chance: float = Field(default=0.0, ge=0.0, le=1.0,
                                        description="Chance of getting a keycard back")
@@ -53,7 +54,7 @@ class BattlePassParams(BaseModel):
     """Battle Pass season parameters."""
 
     cost_coins: float = Field(default=5.0, ge=0, description="Coin cost to buy the pass")
-    season_days: int = Field(default=60, gt=0, description="Season length in days")
+    season_days: int = Field(default=90, gt=0, description="Season length in days")
     coins_returned: float = Field(default=5.0, ge=0,
                                    description="Coins earned back if pass is completed")
     nuts_reward_total: float = Field(default=500.0, ge=0,
@@ -62,6 +63,12 @@ class BattlePassParams(BaseModel):
                                        description="Total scrap from BP rewards over season")
     keycards_rewarded: int = Field(default=10, ge=0,
                                     description="Total keycards rewarded over season")
+    xp_to_complete: float = Field(default=10000.0, gt=0,
+                                   description="Total XP needed to complete the battle pass")
+    gear_reward_count: int = Field(default=5, ge=0,
+                                    description="Number of gear items rewarded over season")
+    gear_avg_value_usd: float = Field(default=3.0, ge=0,
+                                       description="Avg USD value per gear item reward")
     completion_rate: float = Field(default=0.3, ge=0.0, le=1.0,
                                     description="Fraction of BP buyers who complete it")
     purchase_rate: float = Field(default=0.1, ge=0.0, le=1.0,
@@ -73,6 +80,9 @@ class EconomyParams(BaseModel):
 
     instances_per_day: int = Field(default=3, gt=0, description="Instance runs per player per day")
     coin_to_usd: float = Field(default=1.0, gt=0, description="Exchange rate: 1 Coin = X USD")
+    seed_coins: float = Field(default=5.0, ge=0, description="Starting coins for new player")
+    seed_nuts: float = Field(default=1000.0, ge=0, description="Starting nuts for new player")
+    seed_scrap: float = Field(default=1000.0, ge=0, description="Starting scrap for new player")
     buff_cost_scrap: float = Field(default=50.0, ge=0, description="Scrap per buff (placeholder)")
     upgrade_cost_scrap: float = Field(default=100.0, ge=0, description="Scrap per upgrade (placeholder)")
     buffs_per_run: float = Field(default=1.0, ge=0, description="Avg buffs consumed per instance run")
@@ -80,11 +90,11 @@ class EconomyParams(BaseModel):
     character_price_usd: float = Field(default=20.0, gt=0, description="Character skin price (VR baseline)")
 
     instance_tiers: list[InstanceTier] = Field(default_factory=lambda: [
-        InstanceTier(name="common",    nuts_earned=30,  scrap_earned=50,  coins_earned=0.5, gear_value_usd=0.10, keycard_drop_chance=0.10),
-        InstanceTier(name="uncommon",  nuts_earned=60,  scrap_earned=100, coins_earned=1.0, gear_value_usd=0.25, keycard_drop_chance=0.08),
-        InstanceTier(name="rare",      nuts_earned=100, scrap_earned=175, coins_earned=2.0, gear_value_usd=0.75, keycard_drop_chance=0.06),
-        InstanceTier(name="epic",      nuts_earned=150, scrap_earned=275, coins_earned=4.0, gear_value_usd=2.00, keycard_drop_chance=0.04),
-        InstanceTier(name="legendary", nuts_earned=225, scrap_earned=400, coins_earned=8.0, gear_value_usd=5.00, keycard_drop_chance=0.02),
+        InstanceTier(name="common",    nuts_earned=30,  scrap_earned=50,  coins_earned=0.5, xp_earned=50,  gear_value_usd=0.10, keycard_drop_chance=0.10),
+        InstanceTier(name="uncommon",  nuts_earned=60,  scrap_earned=100, coins_earned=1.0, xp_earned=80,  gear_value_usd=0.25, keycard_drop_chance=0.08),
+        InstanceTier(name="rare",      nuts_earned=100, scrap_earned=175, coins_earned=2.0, xp_earned=120, gear_value_usd=0.75, keycard_drop_chance=0.06),
+        InstanceTier(name="epic",      nuts_earned=150, scrap_earned=275, coins_earned=4.0, xp_earned=180, gear_value_usd=2.00, keycard_drop_chance=0.04),
+        InstanceTier(name="legendary", nuts_earned=225, scrap_earned=400, coins_earned=8.0, xp_earned=300, gear_value_usd=5.00, keycard_drop_chance=0.02),
     ])
 
     keycard_tiers: list[KeyCardTier] = Field(default_factory=lambda: [

@@ -2,7 +2,7 @@
 
 Game economic model for Animal Company — a Meta Quest game being converted to mobile.
 
-Simulates player retention, DAU projections, and revenue estimates with interactive Jupyter notebooks and a CLI.
+Simulates player retention, DAU projections, revenue estimates, and currency flows with interactive Jupyter notebooks and a CLI.
 
 ## Requirements
 
@@ -54,6 +54,12 @@ aco revenue
 aco revenue --pct-payers 0.05 --arppu 2.50
 ```
 
+Simulate the currency economy:
+
+```bash
+aco economy
+```
+
 Launch the interactive notebooks:
 
 ```bash
@@ -64,52 +70,47 @@ jupyter lab notebooks/
 
 ```
 src/aco_model/
-├── cli.py            CLI commands (aco simulate, aco revenue)
+├── cli.py            CLI commands (aco simulate, aco revenue, aco economy)
 ├── config.py         YAML config loading
-├── models.py         Pydantic models (RetentionCurve, MonetizationParams)
+├── models.py         Pydantic models (RetentionCurve, MonetizationParams, EconomyParams)
 ├── retention.py      Cohort-based retention simulation
 ├── monetization.py   Revenue estimation from DAU
+├── economy.py        Currency flow simulation (Coins, Nuts, Scrap, Key Cards, Battle Pass)
 ├── state.py          Shared state file for cross-notebook communication
 └── engine.py         Core simulation engine (stub)
 
 notebooks/
 ├── 01_retention.ipynb      Retention curves, DAU projections, sensitivity
-└── 02_monetization.ipynb   Revenue, ARPDAU, cohort revenue analysis
+├── 02_monetization.ipynb   Revenue, ARPDAU, cohort revenue analysis
+└── 03_economy.ipynb        Currency flows, Key Card progression, Battle Pass economics
 
 data/
 └── installs.txt      Daily install counts (tab-separated)
 
-config.yaml           Retention and monetization parameters
+tests/
+├── test_retention.py       Retention simulation tests
+├── test_monetization.py    Revenue estimation tests
+├── test_economy.py         Economy simulation tests
+├── test_config.py          Configuration loading tests
+├── test_state.py           Shared state tests
+└── test_notebooks.py       Headless notebook execution tests
+
+config.yaml           All model parameters (retention, monetization, economy)
 ```
 
 ## Configuration
 
-Edit `config.yaml` to set retention targets and monetization assumptions:
-
-```yaml
-retention:
-  anchors:
-    - [0, 100.0]
-    - [1, 40.0]     # D1 retention
-    - [7, 20.0]     # D7 retention
-    - [30, 5.0]     # D30 retention
-    - [90, 1.0]     # D90 retention
-    - [180, 0.0]    # hard churn
-
-monetization:
-  pct_payers: 0.03   # 3% of DAU
-  arppu: 1.50         # $/day per payer
-
-installs_path: data/installs.txt
-sim_days: 90
-```
+Edit `config.yaml` to set retention targets, monetization assumptions, and economy parameters. See [USAGE.md](USAGE.md) for the full config reference.
 
 ## Tests
 
 ```bash
-pytest
+pytest                  # all tests (117)
+pytest -m "not slow"    # unit tests only (~0.3s)
+pytest -m slow          # notebook smoke tests (~10s)
 ```
 
 ## Documentation
 
-See [USAGE.md](USAGE.md) for detailed CLI and notebook documentation, and [ROADMAP.md](ROADMAP.md) for planned features.
+- [USAGE.md](USAGE.md) — detailed CLI, notebook, and test documentation
+- [ROADMAP.md](ROADMAP.md) — planned features and progress
