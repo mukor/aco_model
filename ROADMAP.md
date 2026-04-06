@@ -122,43 +122,40 @@ After first beta — simulate changes in the funnel falloff graph to show effect
 
 ## Tweaks & Polish
 
-### Today
+### Done
 
 General
 
-- [ ] Round floating point display in config.yaml (e.g., retention anchors show 5.499999 instead of 5.5)
+- [x] Round floating point display in config.yaml (retention Save to Defaults now rounds to 6 decimals)
 
 Notebook 01: Retention Notebook
 
-- [ ] Lengthen DAU simulation to 180 days. Extend `data/installs.txt` to 180 days of mock data.
-- [ ] In DAU simulation section: add avg daily installs and avg DAU text below the chart. Use same y-axis for Installs and DAU.
-- [ ] Wire 365-day projection to retention sliders (currently uses config.yaml retention)
-
-> **Q: Mock installs for days 91-180** — the current install data has a launch spike decaying into organic growth over 90 days. For days 91-180 should we: (a) continue the organic trend from day 90, (b) flat-line at the day 90 rate, or (c) add a marketing beat / seasonal bump? I'll go with (b) unless you say otherwise.
->
-
-go with option b
-
-Notebook 02: Monetization 
+- [x] Extend `data/installs.txt` to 180 days (flat-line at day 90 rate)
 
 Notebook 03: Currency and Economy
 
-- [ ] Add a "Total Out ($)" column to the Instance Loot grid that shows the dollarized value per row, updating reactively. Should match Total Out in the Instance Value per Run (USD) table.
-- [ ] Per-tier buff costs: replace single buff_cost_scrap slider with an input grid (one scrap value per tier). Wire to Reset/Save defaults.
-- [ ] Instance tier breakdown graph: line chart showing how many instances a player plays per day, broken out by tier. One graph for BP players, one for non-BP. Place in Key Card Progression section.
-- [ ] Fix wallet balance dependency on key card progression: currently wallets grow unbounded because the player progression sim may not be consuming resources correctly when stalled. Wallet balances should flatten or decline when player can't afford to progress.
+- [x] Per-tier buff costs: replaced single slider with per-tier values in Instance Loot grid (common=25→legendary=400). Wired to Reset/Save.
+- [x] Fix wallet balance: player progression now consumes keycards per run. No keycards = stalled (no loot, no XP). Wallets flatten naturally.
+- [x] Bronze KC drops: replaced keycard_drop_chance % with avg bronze keycards per run (fractional). Feeds merge pipeline.
+- [x] Seed keycards: new players start with 5 bronze cards (settable input).
+- [x] Buff costs separated into own table under Value In (not loot).
+- [x] Value In / Value Out visual callouts (red/green section headers).
 
-> **Q: Per-tier buff costs** — should we also remove the single "Buff (scrap)" slider, or keep it as a global multiplier/default? I'm thinking: replace the slider entirely with the per-tier grid, default values scaling up (e.g., common=25, uncommon=50, rare=100, epic=200, legendary=400). Sound right?
->
-replace with the per-tier grid.
+Notebook 01: Retention Notebook
 
-> **Q: Instance tier breakdown graph** — the player progression sim already tracks which tier the player is on each run. To show "instances per day by tier" do you want: (a) a single player's tier over time (stepped line showing when they advance), or (b) across the whole DAU, what % of runs are at each tier on each sim day? I think (a) fits Key Card Progression since it's player-centric.
->
-go with (a)
+- [x] DAU simulation: shared y-axis for installs + DAU, avg daily installs + avg DAU text.
+- [x] 365-day projection wired to retention sliders (was already using slider-derived curve).
 
-> **Q: Wallet balance fix** — I think the root issue is that `simulate_player_progression` earns resources every run but only spends on merges (greedy) and buffs. If the player can't merge (not enough cards or nuts), they just accumulate. The fix would be: once the player is at max tier they can reach, stop accumulating (or model some spending). Should we: (a) show a "stall point" marker on the wallet graphs where progression stops, (b) cap accumulation by adding other sinks (store purchases, upgrades), or (c) both?
->
-Let's show a "stall point"
+Notebook 03: Currency and Economy
+
+- [x] Total Out ($) column in Instance Loot grid (reactive, green, matches value table).
+- [x] Instance tier breakdown graph: stepped line in Key Card Progression (BP vs non-BP), red shading for stall regions.
+- [x] Stall point markers on wallet balance graphs (red shading + vertical line at first stall day).
+- [x] Enhanced summary: active runs %, stall day, tier-up list for both player types.
+
+### Remaining
+
+(all items completed)
 
 ### Later
 
