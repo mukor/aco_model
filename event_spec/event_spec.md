@@ -27,7 +27,12 @@ Every event has these fields at the top level:
 | `platform` | enum | yes | One of: `ios`, `android`, `quest` |
 | `event_type` | string | yes | One of the event types defined below |
 | `session_id` | string | yes | Current session ID (UUID) |
+| `locale` | string (BCP 47) | yes | Language + region tag (e.g. `en-US`, `pt-BR`, `ja-JP`). Unity: `CultureInfo.CurrentCulture.Name` |
+| `device_make` | string | yes | Device manufacturer (e.g. "Apple", "Samsung", "Meta"). Unity: parsed from `SystemInfo.deviceModel` |
+| `device_model` | string | yes | Device model identifier (e.g. "iPhone14,3", "SM-S918B"). Unity: `SystemInfo.deviceModel` |
 | `payload` | object | yes | Event-type-specific data |
+
+> **Note on IP address:** `client_ip` is captured **server-side** by the event collector from the HTTP request header, not sent by the client. This avoids spoofing, handles NAT correctly, and keeps PII off the client. The collector appends `client_ip` and `received_at` to each event before writing to the warehouse.
 
 ### Envelope Example
 
@@ -38,6 +43,9 @@ Every event has these fields at the top level:
   "platform": "ios",
   "event_type": "instance",
   "session_id": "a7f3b2c1-9d8e-4f6a-b5c3-1e2d3f4a5b6c",
+  "locale": "en-US",
+  "device_make": "Apple",
+  "device_model": "iPhone14,3",
   "payload": { /* event-specific */ }
 }
 ```
@@ -58,9 +66,10 @@ Triggered when a player logs in or out of the game.
 |-------|------|----------|-------------|
 | `action` | enum | yes | `start` or `end` |
 | `duration_seconds` | integer | on end | Session length in seconds |
-| `device_model` | string | yes | Device model (e.g. "iPhone14,3") |
 | `os_version` | string | yes | OS version (e.g. "17.4.1") |
 | `app_version` | string | yes | Game client version (e.g. "1.2.3") |
+
+> Note: `device_make` and `device_model` are in the common envelope, not repeated here.
 
 **Example (session end):**
 
@@ -68,7 +77,6 @@ Triggered when a player logs in or out of the game.
 {
   "action": "end",
   "duration_seconds": 1847,
-  "device_model": "iPhone14,3",
   "os_version": "17.4.1",
   "app_version": "1.2.3"
 }

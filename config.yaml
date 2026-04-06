@@ -1,9 +1,9 @@
 retention:
   anchors:
   - [0, 100.0]
-  - [1, 48.0]
-  - [7, 26.0]
-  - [30, 6.0]
+  - [1, 41.0]
+  - [7, 22.0]
+  - [30, 5.5]
   - [90, 1.5]
   - [180, 0.0]
 monetization: {pct_payers: 0.04, arppu: 9.5}
@@ -13,23 +13,23 @@ economy:
   seed_coins: 5.0
   seed_nuts: 1000.0
   seed_scrap: 1000.0
-  buff_cost_scrap: 0.0
-  upgrade_cost_scrap: 100.0
+  seed_keycards: 5
   buffs_per_run: 1.0
+  upgrade_cost_scrap: 100.0
   outfit_price_usd: 7.0
   character_price_usd: 20.0
   instance_tiers:
-  - {name: common, nuts_earned: 50, scrap_earned: 100, coins_earned: 0.01, xp_earned: 50, gear_value_usd: 0.025, keycard_drop_chance: 0.0}
-  - {name: uncommon, nuts_earned: 70, scrap_earned: 200, coins_earned: 0.02, xp_earned: 80, gear_value_usd: 0.25, keycard_drop_chance: 0.0}
-  - {name: rare, nuts_earned: 100, scrap_earned: 300, coins_earned: 0.75, xp_earned: 120, gear_value_usd: 0.5, keycard_drop_chance: 0.0}
-  - {name: epic, nuts_earned: 200, scrap_earned: 400, coins_earned: 1.5, xp_earned: 180, gear_value_usd: 2.0, keycard_drop_chance: 0.0}
-  - {name: legendary, nuts_earned: 400, scrap_earned: 500, coins_earned: 3.5, xp_earned: 300, gear_value_usd: 5.0, keycard_drop_chance: 0.0}
+  - {name: common, nuts_earned: 50, scrap_earned: 200, coins_earned: 0.01, xp_earned: 50, gear_value_usd: 0.025, bronze_kc_drops: 0.3, buff_cost_scrap: 25}
+  - {name: uncommon, nuts_earned: 70, scrap_earned: 800, coins_earned: 0.02, xp_earned: 80, gear_value_usd: 0.25, bronze_kc_drops: 0.5, buff_cost_scrap: 50}
+  - {name: rare, nuts_earned: 100, scrap_earned: 1600, coins_earned: 0.75, xp_earned: 120, gear_value_usd: 0.5, bronze_kc_drops: 0.8, buff_cost_scrap: 100}
+  - {name: epic, nuts_earned: 200, scrap_earned: 3200, coins_earned: 1.5, xp_earned: 180, gear_value_usd: 2.0, bronze_kc_drops: 1.2, buff_cost_scrap: 200}
+  - {name: legendary, nuts_earned: 300, scrap_earned: 6400, coins_earned: 3.5, xp_earned: 300, gear_value_usd: 5.0, bronze_kc_drops: 2.0, buff_cost_scrap: 400}
   keycard_tiers:
   - {name: bronze, cards_required: 0, merge_cost_nuts: 0.0, instance_tier: common}
-  - {name: silver, cards_required: 2, merge_cost_nuts: 0.0, instance_tier: uncommon}
-  - {name: gold, cards_required: 2, merge_cost_nuts: 0.0, instance_tier: rare}
-  - {name: mithril, cards_required: 2, merge_cost_nuts: 0.0, instance_tier: epic}
-  - {name: vibranium, cards_required: 2, merge_cost_nuts: 0.0, instance_tier: legendary}
+  - {name: silver, cards_required: 2, merge_cost_nuts: 200.0, instance_tier: uncommon}
+  - {name: gold, cards_required: 2, merge_cost_nuts: 200.0, instance_tier: rare}
+  - {name: mithril, cards_required: 2, merge_cost_nuts: 200.0, instance_tier: epic}
+  - {name: vibranium, cards_required: 2, merge_cost_nuts: 200.0, instance_tier: legendary}
   battle_pass:
     cost_coins: 5.0
     season_days: 90

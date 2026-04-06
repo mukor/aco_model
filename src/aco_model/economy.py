@@ -22,7 +22,7 @@ class EconomyResult:
         avg_nuts_per_run = np.mean([t.nuts_earned for t in params.instance_tiers])
         avg_scrap_per_run = np.mean([t.scrap_earned for t in params.instance_tiers])
         avg_coins_per_run = np.mean([t.coins_earned for t in params.instance_tiers])
-        avg_keycard_return = np.mean([t.keycard_drop_chance for t in params.instance_tiers])
+        avg_bronze_kc_drops = np.mean([t.bronze_kc_drops for t in params.instance_tiers])
 
         # ── Nuts ──────────────────────────────────────────────────────────
         # Earned: instance runs + Battle Pass rewards (spread over season)
@@ -35,7 +35,8 @@ class EconomyResult:
         # Spent: keycard merging (simplified — avg merge cost across tiers)
         # Each run consumes 1 keycard, minus the chance of getting one back.
         # Net keycards consumed drives merge demand.
-        net_cards_consumed = runs_per_day * (1.0 - avg_keycard_return)
+        # Each run consumes 1 keycard but drops fractional bronze cards back
+        net_cards_consumed = runs_per_day * (1.0 - avg_bronze_kc_drops)
         merge_costs = [t.merge_cost_nuts for t in params.keycard_tiers if t.merge_cost_nuts > 0]
         avg_merge_cost = np.mean(merge_costs) if merge_costs else 0.0
         # Fraction of cards that need merging (assume ~50% need to be merged up)
@@ -47,8 +48,9 @@ class EconomyResult:
         bp_scrap_per_day = bp_buyers * (bp.scrap_reward_total / bp.season_days)
         self._scrap_earned = runs_per_day * avg_scrap_per_run + bp_scrap_per_day
 
-        # Spent: buffs per run + upgrades (simplified as fraction of earn)
-        buff_cost_per_run = params.buffs_per_run * params.buff_cost_scrap
+        # Spent: per-tier buff costs (averaged across tiers)
+        avg_buff_cost = np.mean([t.buff_cost_scrap for t in params.instance_tiers])
+        buff_cost_per_run = params.buffs_per_run * avg_buff_cost
         self._scrap_spent = runs_per_day * buff_cost_per_run
 
         # ── Coins ─────────────────────────────────────────────────────────
@@ -62,7 +64,7 @@ class EconomyResult:
 
         # ── Keycards ──────────────────────────────────────────────────────
         self._keycards_consumed = runs_per_day
-        self._keycards_returned = runs_per_day * avg_keycard_return
+        self._keycards_returned = runs_per_day * avg_bronze_kc_drops
         bp_cards_per_day = bp_buyers * (bp.keycards_rewarded / bp.season_days)
         self._keycards_from_bp = bp_cards_per_day
 
@@ -131,15 +133,15 @@ class EconomyResult:
         rows = []
         for i, tier in enumerate(self.params.instance_tiers):
             kc = self.params.keycard_tiers[i] if i < len(self.params.keycard_tiers) else None
-            value_in = self.params.buff_cost_scrap * self.params.buffs_per_run
-            if kc and kc.merge_cost_nuts > 0:
-                value_in += kc.merge_cost_nuts / kc.cards_required  # amortized merge cost
-            value_out = tier.nuts_earned + tier.scrap_earned
+            value_in = tier.buff_cost_scrap * self.params.buffs_per_run
+            if kc and kc.merge_cost_nuts > 0 and kc.cards_required > 0:
+                value_in += kc.merge_cost_nuts / kc.cards_required
+            value_out = tier.nuts_earned + tier.scrap_earned + tier.coins_earned
             rows.append({
                 "tier": tier.name,
                 "nuts_earned": tier.nuts_earned,
                 "scrap_earned": tier.scrap_earned,
-                "keycard_return_%": round(tier.keycard_drop_chance * 100, 1),
+                "bronze_kc_drops": tier.bronze_kc_drops,
                 "value_in": round(value_in, 1),
                 "value_out": round(value_out, 1),
                 "net_value": round(value_out - value_in, 1),
@@ -202,6 +204,7 @@ def simulate_player_progression(
 
     Deterministic model: keycard drops are fractional (expected value),
     greedy tier progression (merge up as soon as affordable).
+    Players must have keycards to run instances — no card = stalled.
 
     Args:
         params: Economy configuration.
@@ -209,7 +212,7 @@ def simulate_player_progression(
         has_battle_pass: Whether the player bought the BP.
 
     Returns:
-        DataFrame with one row per instance run, tracking wallet, tier, XP.
+        DataFrame with one row per run slot, tracking wallet, tier, XP, stall state.
     """
     # Build lookups
     kc_order = [kc.name for kc in params.keycard_tiers]
@@ -222,10 +225,11 @@ def simulate_player_progression(
     nuts = params.seed_nuts
     scrap = params.seed_scrap
     xp = 0.0
-    current_kc_idx = 0  # start at bronze
+    current_kc_idx = 0  # start at bronze (highest tier player has reached)
 
     # Keycard inventory (fractional for deterministic model)
     kc_inventory = {name: 0.0 for name in kc_order}
+    kc_inventory[kc_order[0]] = float(params.seed_keycards)  # starting bronze cards
 
     # BP reward rates per XP point
     bp = params.battle_pass
@@ -239,98 +243,142 @@ def simulate_player_progression(
         bp_coins_per_xp = bp.coins_returned / bp.xp_to_complete
         bp_kc_per_xp = bp.keycards_rewarded / bp.xp_to_complete
 
-    total_runs = params.instances_per_day * max_player_days
     cum_nuts_earned = 0.0
     cum_scrap_earned = 0.0
     cum_coins_earned = 0.0
     cum_xp_earned = 0.0
+    run_counter = 0
     rows = []
 
-    for run_idx in range(total_runs):
-        player_day = run_idx // params.instances_per_day + 1
+    for player_day in range(1, max_player_days + 1):
+        for run_slot in range(params.instances_per_day):
+            run_counter += 1
 
-        # Current tier from keycard index
-        current_kc = kc_order[current_kc_idx]
-        current_instance = kc_to_instance[current_kc]
-        tier = tier_by_name[current_instance]
+            # Find a tier the player can run (has keycard for)
+            run_kc_idx = current_kc_idx
+            stalled = False
 
-        # Earn from this run
-        earned_nuts = tier.nuts_earned
-        earned_scrap = tier.scrap_earned
-        earned_coins = tier.coins_earned
-        earned_xp = tier.xp_earned
+            # Check if player has a keycard at their highest reached tier
+            if kc_inventory[kc_order[run_kc_idx]] < 1.0:
+                # Try lower tiers
+                found = False
+                for lower_idx in range(run_kc_idx - 1, -1, -1):
+                    if kc_inventory[kc_order[lower_idx]] >= 1.0:
+                        run_kc_idx = lower_idx
+                        found = True
+                        break
+                if not found:
+                    # No keycards anywhere — player is stalled
+                    stalled = True
 
-        # Spend: buffs (clamped to available scrap)
-        buff_cost = params.buff_cost_scrap * params.buffs_per_run
-        spent_scrap = min(buff_cost, scrap + earned_scrap)
+            tier_up = False
 
-        # Update wallet
-        nuts += earned_nuts
-        scrap += earned_scrap - spent_scrap
-        coins += earned_coins
-        xp += earned_xp
+            if stalled:
+                # Record idle slot — no loot, no progress
+                rows.append({
+                    "run": run_counter,
+                    "player_day": player_day,
+                    "instance_tier": kc_to_instance[kc_order[current_kc_idx]],
+                    "keycard_tier": kc_order[current_kc_idx],
+                    "coins": round(coins, 2),
+                    "nuts": round(nuts, 2),
+                    "scrap": round(scrap, 2),
+                    "xp": round(xp, 2),
+                    "cum_nuts_earned": round(cum_nuts_earned, 2),
+                    "cum_scrap_earned": round(cum_scrap_earned, 2),
+                    "cum_coins_earned": round(cum_coins_earned, 2),
+                    "cum_xp_earned": round(cum_xp_earned, 2),
+                    "tier_up": False,
+                    "stalled": True,
+                    "bp_complete": has_battle_pass and xp >= bp.xp_to_complete,
+                    "has_bp": has_battle_pass,
+                })
+                continue
 
-        cum_nuts_earned += earned_nuts
-        cum_scrap_earned += earned_scrap
-        cum_coins_earned += earned_coins
-        cum_xp_earned += earned_xp
+            # Consume 1 keycard
+            run_kc_name = kc_order[run_kc_idx]
+            kc_inventory[run_kc_name] -= 1.0
 
-        # BP holder bonus (amortized by XP, stops at completion)
-        bp_complete = False
-        if has_battle_pass and xp <= bp.xp_to_complete:
-            bp_nuts = earned_xp * bp_nuts_per_xp
-            bp_scrap = earned_xp * bp_scrap_per_xp
-            bp_coins = earned_xp * bp_coins_per_xp
-            nuts += bp_nuts
-            scrap += bp_scrap
-            coins += bp_coins
-            cum_nuts_earned += bp_nuts
-            cum_scrap_earned += bp_scrap
-            cum_coins_earned += bp_coins
-            # BP keycards: add fractional bronze cards
-            kc_inventory[kc_order[0]] += earned_xp * bp_kc_per_xp
-        if has_battle_pass and xp >= bp.xp_to_complete:
-            bp_complete = True
+            # Get the instance tier for this run
+            current_instance = kc_to_instance[run_kc_name]
+            tier = tier_by_name[current_instance]
 
-        # Keycard drop: fractional card at current tier
-        kc_inventory[current_kc] += tier.keycard_drop_chance
+            # Earn from this run
+            earned_nuts = tier.nuts_earned
+            earned_scrap = tier.scrap_earned
+            earned_coins = tier.coins_earned
+            earned_xp = tier.xp_earned
 
-        # Greedy tier progression: try to merge up
-        tier_up = False
-        while current_kc_idx + 1 < len(kc_order):
-            next_kc_name = kc_order[current_kc_idx + 1]
-            next_kc = kc_by_name[next_kc_name]
-            prev_kc_name = kc_order[current_kc_idx]
+            # Spend: per-tier buff cost (clamped to available scrap)
+            buff_cost = tier.buff_cost_scrap * params.buffs_per_run
+            spent_scrap = min(buff_cost, scrap + earned_scrap)
 
-            cards_available = kc_inventory[prev_kc_name]
-            cards_needed = next_kc.cards_required
-            nuts_needed = next_kc.merge_cost_nuts
+            # Update wallet
+            nuts += earned_nuts
+            scrap += earned_scrap - spent_scrap
+            coins += earned_coins
+            xp += earned_xp
 
-            if cards_needed > 0 and cards_available >= cards_needed and nuts >= nuts_needed:
-                kc_inventory[prev_kc_name] -= cards_needed
-                nuts -= nuts_needed
-                kc_inventory[next_kc_name] += 1
-                current_kc_idx += 1
-                tier_up = True
-            else:
-                break
+            cum_nuts_earned += earned_nuts
+            cum_scrap_earned += earned_scrap
+            cum_coins_earned += earned_coins
+            cum_xp_earned += earned_xp
 
-        rows.append({
-            "run": run_idx + 1,
-            "player_day": player_day,
-            "instance_tier": current_instance,
-            "keycard_tier": kc_order[current_kc_idx],
-            "coins": round(coins, 2),
-            "nuts": round(nuts, 2),
-            "scrap": round(scrap, 2),
-            "xp": round(xp, 2),
-            "cum_nuts_earned": round(cum_nuts_earned, 2),
-            "cum_scrap_earned": round(cum_scrap_earned, 2),
-            "cum_coins_earned": round(cum_coins_earned, 2),
-            "cum_xp_earned": round(cum_xp_earned, 2),
-            "tier_up": tier_up,
-            "bp_complete": bp_complete,
-            "has_bp": has_battle_pass,
-        })
+            # Bronze keycard drops (fractional)
+            kc_inventory[kc_order[0]] += tier.bronze_kc_drops
+
+            # BP holder bonus (amortized by XP, stops at completion)
+            bp_complete = False
+            if has_battle_pass and xp <= bp.xp_to_complete:
+                bp_nuts = earned_xp * bp_nuts_per_xp
+                bp_scrap = earned_xp * bp_scrap_per_xp
+                bp_coins = earned_xp * bp_coins_per_xp
+                nuts += bp_nuts
+                scrap += bp_scrap
+                coins += bp_coins
+                cum_nuts_earned += bp_nuts
+                cum_scrap_earned += bp_scrap
+                cum_coins_earned += bp_coins
+                kc_inventory[kc_order[0]] += earned_xp * bp_kc_per_xp
+            if has_battle_pass and xp >= bp.xp_to_complete:
+                bp_complete = True
+
+            # Greedy tier progression: try to merge up
+            while current_kc_idx + 1 < len(kc_order):
+                next_kc_name = kc_order[current_kc_idx + 1]
+                next_kc = kc_by_name[next_kc_name]
+                prev_kc_name = kc_order[current_kc_idx]
+
+                cards_available = kc_inventory[prev_kc_name]
+                cards_needed = next_kc.cards_required
+                nuts_needed = next_kc.merge_cost_nuts
+
+                if cards_needed > 0 and cards_available >= cards_needed and nuts >= nuts_needed:
+                    kc_inventory[prev_kc_name] -= cards_needed
+                    nuts -= nuts_needed
+                    kc_inventory[next_kc_name] += 1
+                    current_kc_idx += 1
+                    tier_up = True
+                else:
+                    break
+
+            rows.append({
+                "run": run_counter,
+                "player_day": player_day,
+                "instance_tier": current_instance,
+                "keycard_tier": kc_order[current_kc_idx],
+                "coins": round(coins, 2),
+                "nuts": round(nuts, 2),
+                "scrap": round(scrap, 2),
+                "xp": round(xp, 2),
+                "cum_nuts_earned": round(cum_nuts_earned, 2),
+                "cum_scrap_earned": round(cum_scrap_earned, 2),
+                "cum_coins_earned": round(cum_coins_earned, 2),
+                "cum_xp_earned": round(cum_xp_earned, 2),
+                "tier_up": tier_up,
+                "stalled": False,
+                "bp_complete": bp_complete,
+                "has_bp": has_battle_pass,
+            })
 
     return pd.DataFrame(rows)
