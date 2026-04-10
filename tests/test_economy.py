@@ -327,6 +327,32 @@ class TestPlayerProgression:
         assert df.iloc[0]["player_day"] == 1
         assert df.iloc[default_params.instances_per_day]["player_day"] == 2
 
+    def test_cascade_merge(self):
+        """Bronze cards should auto-merge up through multiple tiers."""
+        params = EconomyParams(
+            seed_keycards=20,
+            seed_nuts=10000.0,
+            instances_per_day=5,
+            instance_tiers=[
+                InstanceTier(name="common", nuts_earned=100, scrap_earned=50, bronze_kc_drops=3.0),
+                InstanceTier(name="uncommon", nuts_earned=150, scrap_earned=100, bronze_kc_drops=2.0),
+                InstanceTier(name="rare", nuts_earned=200, scrap_earned=150, bronze_kc_drops=1.5),
+            ],
+            keycard_tiers=[
+                KeyCardTier(name="bronze", cards_required=0, merge_cost_nuts=0, instance_tier="common"),
+                KeyCardTier(name="silver", cards_required=2, merge_cost_nuts=100, instance_tier="uncommon"),
+                KeyCardTier(name="gold", cards_required=2, merge_cost_nuts=200, instance_tier="rare"),
+            ],
+        )
+        df = simulate_player_progression(params, max_player_days=30)
+        # Player should reach at least gold tier via cascade merging
+        tiers_reached = df["keycard_tier"].unique()
+        assert "gold" in tiers_reached, f"Only reached: {tiers_reached}"
+        # Should have runs at all three tiers
+        active = df[~df["stalled"]]
+        instance_tiers_played = active["instance_tier"].unique()
+        assert len(instance_tiers_played) >= 2, f"Only played: {instance_tiers_played}"
+
     def test_wallet_flattens_when_stalled(self):
         """Once stalled, wallet should stop growing."""
         params = EconomyParams(

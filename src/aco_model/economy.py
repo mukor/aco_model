@@ -254,27 +254,31 @@ def simulate_player_progression(
         for run_slot in range(params.instances_per_day):
             run_counter += 1
 
-            # Find a tier the player can run (has keycard for)
-            run_kc_idx = current_kc_idx
+            # Run selection: play at the HIGHEST tier that has a card
+            # Player always runs the best instance available
+            run_kc_idx = -1
             stalled = False
 
-            # Check if player has a keycard at their highest reached tier
-            if kc_inventory[kc_order[run_kc_idx]] < 1.0:
-                # Try lower tiers
-                found = False
-                for lower_idx in range(run_kc_idx - 1, -1, -1):
-                    if kc_inventory[kc_order[lower_idx]] >= 1.0:
-                        run_kc_idx = lower_idx
-                        found = True
-                        break
-                if not found:
-                    # No keycards anywhere — player is stalled
-                    stalled = True
+            for check_idx in range(len(kc_order) - 1, -1, -1):
+                if kc_inventory[kc_order[check_idx]] >= 1.0:
+                    run_kc_idx = check_idx
+                    break
+
+            if run_kc_idx < 0:
+                stalled = True
 
             tier_up = False
 
+            # Snapshot keycard inventory per tier
+            def _kc_snapshot():
+                row = {"kc_inventory": round(sum(kc_inventory.values()), 2)}
+                for kc_name in kc_order:
+                    row[f"kc_{kc_name}"] = round(kc_inventory[kc_name], 2)
+                return row
+
             if stalled:
                 # Record idle slot — no loot, no progress
+                kc_snap = _kc_snapshot()
                 rows.append({
                     "run": run_counter,
                     "player_day": player_day,
@@ -284,6 +288,11 @@ def simulate_player_progression(
                     "nuts": round(nuts, 2),
                     "scrap": round(scrap, 2),
                     "xp": round(xp, 2),
+                    "card_used": "none",
+                    "earned_nuts": 0, "earned_scrap": 0, "earned_coins": 0, "earned_xp": 0,
+                    "spent_nuts": 0, "spent_scrap": 0,
+                    "bronze_kc_in": 0, "kc_consumed": 0,
+                    **kc_snap,
                     "cum_nuts_earned": round(cum_nuts_earned, 2),
                     "cum_scrap_earned": round(cum_scrap_earned, 2),
                     "cum_coins_earned": round(cum_coins_earned, 2),
@@ -325,7 +334,8 @@ def simulate_player_progression(
             cum_xp_earned += earned_xp
 
             # Bronze keycard drops (fractional)
-            kc_inventory[kc_order[0]] += tier.bronze_kc_drops
+            run_bronze_kc_in = tier.bronze_kc_drops
+            kc_inventory[kc_order[0]] += run_bronze_kc_in
 
             # BP holder bonus (amortized by XP, stops at completion)
             bp_complete = False
@@ -336,41 +346,66 @@ def simulate_player_progression(
                 nuts += bp_nuts
                 scrap += bp_scrap
                 coins += bp_coins
+                earned_nuts += bp_nuts
+                earned_scrap += bp_scrap
+                earned_coins += bp_coins
                 cum_nuts_earned += bp_nuts
                 cum_scrap_earned += bp_scrap
                 cum_coins_earned += bp_coins
-                kc_inventory[kc_order[0]] += earned_xp * bp_kc_per_xp
+                bp_kc_earned = earned_xp * bp_kc_per_xp
+                kc_inventory[kc_order[0]] += bp_kc_earned
+                run_bronze_kc_in += bp_kc_earned
             if has_battle_pass and xp >= bp.xp_to_complete:
                 bp_complete = True
 
-            # Greedy tier progression: try to merge up
-            while current_kc_idx + 1 < len(kc_order):
-                next_kc_name = kc_order[current_kc_idx + 1]
-                next_kc = kc_by_name[next_kc_name]
-                prev_kc_name = kc_order[current_kc_idx]
+            # Merge: bottom-up cascade, merge everything as high as possible
+            run_nuts_spent_merge = 0.0
+            merged_any = True
+            while merged_any:
+                merged_any = False
+                for merge_idx in range(len(kc_order) - 1):
+                    source_name = kc_order[merge_idx]
+                    target_name = kc_order[merge_idx + 1]
+                    target_kc = kc_by_name[target_name]
 
-                cards_available = kc_inventory[prev_kc_name]
-                cards_needed = next_kc.cards_required
-                nuts_needed = next_kc.merge_cost_nuts
+                    cards_available = kc_inventory[source_name]
+                    cards_needed = target_kc.cards_required
+                    nuts_needed = target_kc.merge_cost_nuts
 
-                if cards_needed > 0 and cards_available >= cards_needed and nuts >= nuts_needed:
-                    kc_inventory[prev_kc_name] -= cards_needed
-                    nuts -= nuts_needed
-                    kc_inventory[next_kc_name] += 1
-                    current_kc_idx += 1
-                    tier_up = True
-                else:
-                    break
+                    while cards_needed > 0 and cards_available >= cards_needed and nuts >= nuts_needed:
+                        kc_inventory[source_name] -= cards_needed
+                        nuts -= nuts_needed
+                        run_nuts_spent_merge += nuts_needed
+                        kc_inventory[target_name] += 1
+                        cards_available = kc_inventory[source_name]
+                        merged_any = True
 
+                        # Track highest tier reached
+                        tier_idx = merge_idx + 1
+                        if tier_idx > current_kc_idx:
+                            current_kc_idx = tier_idx
+                            tier_up = True
+
+            kc_snap = _kc_snapshot()
             rows.append({
                 "run": run_counter,
                 "player_day": player_day,
                 "instance_tier": current_instance,
                 "keycard_tier": kc_order[current_kc_idx],
+                "card_used": run_kc_name,
                 "coins": round(coins, 2),
                 "nuts": round(nuts, 2),
                 "scrap": round(scrap, 2),
                 "xp": round(xp, 2),
+                "earned_nuts": round(earned_nuts, 2),
+                "earned_scrap": round(earned_scrap, 2),
+                "earned_coins": round(earned_coins, 2),
+                "earned_xp": round(earned_xp, 2),
+                "spent_nuts": round(run_nuts_spent_merge, 2),
+                "spent_scrap": round(spent_scrap, 2),
+                "bronze_kc_in": round(run_bronze_kc_in, 2),
+                "kc_consumed": 1,
+                **kc_snap,
                 "cum_nuts_earned": round(cum_nuts_earned, 2),
                 "cum_scrap_earned": round(cum_scrap_earned, 2),
                 "cum_coins_earned": round(cum_coins_earned, 2),
