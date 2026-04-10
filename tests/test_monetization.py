@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aco_model.models import MonetizationParams, RetentionCurve
+from aco_model.models import MonetizationParams, RetentionCurve, ViralParams
 from aco_model.monetization import RevenueResult, estimate_revenue
 from aco_model.retention import SimResult, load_installs, simulate
 
@@ -193,3 +193,54 @@ class TestRevenueResult:
     def test_sim_reference(self, sim_result, default_params):
         rev = estimate_revenue(sim_result, default_params)
         assert rev.sim is sim_result
+
+
+# ── Viral Revenue Split ──────────────────────────────────────────────────
+
+class TestViralRevenue:
+    @pytest.fixture
+    def viral_sim(self, sample_installs_file):
+        """A SimResult with viral cohorts mixed in."""
+        installs = load_installs(sample_installs_file)
+        return simulate(installs, RetentionCurve(), sim_days=30,
+                        viral=ViralParams(enabled=True, k_factor=0.5))
+
+    def test_organic_plus_viral_equals_total(self, viral_sim, default_params):
+        rev = estimate_revenue(viral_sim, default_params)
+        np.testing.assert_allclose(
+            rev.organic_revenue + rev.viral_revenue,
+            rev.daily_revenue,
+            rtol=1e-12,
+        )
+
+    def test_viral_revenue_zero_when_disabled(self, sim_result, default_params):
+        """A non-viral SimResult should attribute everything to organic."""
+        rev = estimate_revenue(sim_result, default_params)
+        assert rev.viral_revenue_total == 0.0
+        assert rev.organic_revenue_total == pytest.approx(rev.total_revenue)
+
+    def test_viral_lift_matches_dau_lift(self, sample_installs_file, default_params):
+        """Since revenue is linear in DAU, % lift on revenue == % lift on DAU."""
+        installs = load_installs(sample_installs_file)
+        baseline = simulate(installs, RetentionCurve(), sim_days=30)
+        viral = simulate(installs, RetentionCurve(), sim_days=30,
+                          viral=ViralParams(enabled=True, k_factor=0.5))
+        rev_base = estimate_revenue(baseline, default_params)
+        rev_viral = estimate_revenue(viral, default_params)
+        dau_lift = viral.dau.sum() / baseline.dau.sum() - 1
+        rev_lift = rev_viral.total_revenue / rev_base.total_revenue - 1
+        assert dau_lift == pytest.approx(rev_lift, rel=1e-6)
+
+    def test_viral_revenue_proportional_to_viral_dau(self, viral_sim, default_params):
+        """On any day with viral activity, viral_rev/total_rev == viral_share_of_cohort_matrix."""
+        rev = estimate_revenue(viral_sim, default_params)
+        # Compare against the unrounded cohort matrix shares (since rev splits on
+        # the unrounded values too — sim.dau is rounded and would introduce noise).
+        viral_mask = viral_sim.cohort_origin == "viral"
+        viral_sum = viral_sim.cohort_matrix[viral_mask].sum(axis=0)
+        total_sum = viral_sim.cohort_matrix.sum(axis=0)
+        active = (total_sum > 0) & (viral_sum > 0)
+        assert active.any(), "fixture should have at least one viral-active day"
+        rev_share = rev.viral_revenue[active] / rev.daily_revenue[active]
+        cohort_share = viral_sum[active] / total_sum[active]
+        np.testing.assert_allclose(rev_share, cohort_share, rtol=1e-12)

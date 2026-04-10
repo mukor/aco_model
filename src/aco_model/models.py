@@ -16,6 +16,21 @@ class RetentionCurve(BaseModel):
     )
 
 
+class ViralParams(BaseModel):
+    """K-factor (viral install) parameters.
+
+    Each install generates `k_factor` viral installs total, spread evenly across
+    `viral_window_days` days after install, scaled by retention. See USAGE.md
+    "Viral Growth (K-Factor)" for the math.
+    """
+
+    enabled: bool = Field(default=False, description="Toggle k-factor on/off")
+    k_factor: float = Field(default=0.3, ge=0.0,
+                            description="Invites per install over the entire viral window")
+    viral_window_days: int = Field(default=7, gt=0,
+                                    description="Days after install during which a user invites")
+
+
 class MonetizationParams(BaseModel):
     """High-level revenue estimation parameters."""
 

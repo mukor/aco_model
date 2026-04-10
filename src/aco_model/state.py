@@ -8,7 +8,7 @@ from typing import Optional
 import numpy as np
 from pydantic import BaseModel, Field
 
-from aco_model.models import EconomyParams, MonetizationParams
+from aco_model.models import EconomyParams, MonetizationParams, ViralParams
 
 
 DEFAULT_STATE_PATH = Path("output/state.json")
@@ -20,6 +20,7 @@ class SimState(BaseModel):
     retention_anchors: list[tuple[int, float]]
     monetization: MonetizationParams = Field(default_factory=MonetizationParams)
     economy: EconomyParams | None = None
+    viral: ViralParams = Field(default_factory=ViralParams)
     sim_days: int
     dau: list[int]
     updated_at: str
@@ -30,6 +31,7 @@ def save_state(
     retention_anchors: list[tuple[int, float]],
     monetization: MonetizationParams | None = None,
     economy: EconomyParams | None = None,
+    viral: ViralParams | None = None,
     path: Path = DEFAULT_STATE_PATH,
 ) -> None:
     """Save simulation state to a JSON file.
@@ -38,12 +40,15 @@ def save_state(
         sim: SimResult from retention simulation (or anything with .dau and .sim_days).
         retention_anchors: Current retention curve anchor points.
         monetization: Current monetization params (uses defaults if None).
+        economy: Current economy params (optional).
+        viral: Current viral params (uses defaults if None).
         path: Output file path.
     """
     state = SimState(
         retention_anchors=retention_anchors,
         monetization=monetization or MonetizationParams(),
         economy=economy,
+        viral=viral or ViralParams(),
         sim_days=sim.sim_days,
         dau=[int(x) for x in sim.dau],
         updated_at=datetime.now().isoformat(timespec="seconds"),

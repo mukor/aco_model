@@ -6,8 +6,16 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aco_model.models import RetentionCurve
-from aco_model.retention import SimResult, load_installs, retention_vector, simulate
+from aco_model.models import RetentionCurve, ViralParams
+from aco_model.retention import (
+    SimResult,
+    k_from_sends,
+    load_installs,
+    retention_vector,
+    sends_from_k,
+    simulate,
+    simulate_with_viral,
+)
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────
@@ -325,3 +333,96 @@ class TestSimulate:
         installs = load_installs(sample_installs_file)
         result = simulate(installs, flat_curve, sim_days=5).to_dataframe()
         assert result.iloc[1]["dau"] > 1800
+
+
+# ── Viral / K-Factor Simulation ──────────────────────────────────────────
+
+class TestViralSimulation:
+    def test_disabled_viral_matches_simulate(self, sample_installs_file, default_curve):
+        """viral.enabled=False should produce identical DAU to simulate()."""
+        installs = load_installs(sample_installs_file)
+        baseline = simulate(installs, default_curve, sim_days=30)
+        with_viral_off = simulate(installs, default_curve, sim_days=30,
+                                   viral=ViralParams(enabled=False, k_factor=0.5))
+        np.testing.assert_array_equal(baseline.dau, with_viral_off.dau)
+
+    def test_zero_k_matches_simulate(self, sample_installs_file, default_curve):
+        """k_factor=0 with enabled=True should still match the baseline."""
+        installs = load_installs(sample_installs_file)
+        baseline = simulate(installs, default_curve, sim_days=30)
+        viral = simulate_with_viral(installs, default_curve, sim_days=30,
+                                     viral=ViralParams(enabled=True, k_factor=0.0))
+        np.testing.assert_array_equal(baseline.dau, viral.dau)
+
+    def test_positive_k_increases_dau(self, sample_installs_file, default_curve):
+        """k>0 should produce strictly more DAU than k=0 (after viral kicks in)."""
+        installs = load_installs(sample_installs_file)
+        baseline = simulate(installs, default_curve, sim_days=30)
+        viral = simulate_with_viral(installs, default_curve, sim_days=30,
+                                     viral=ViralParams(enabled=True, k_factor=0.5))
+        # Baseline DAU should never exceed viral DAU on any day after the first install
+        assert (viral.dau >= baseline.dau).all()
+        # And strictly greater on at least some days
+        assert (viral.dau > baseline.dau).any()
+
+    def test_organic_plus_viral_equals_total(self, sample_installs_file, default_curve):
+        """organic_dau + viral_dau should equal total dau (within rounding)."""
+        installs = load_installs(sample_installs_file)
+        result = simulate_with_viral(installs, default_curve, sim_days=30,
+                                      viral=ViralParams(enabled=True, k_factor=0.4))
+        # The dau properties round independently, so allow ±n_cohorts of rounding slop.
+        # Easier: check the underlying float matrix sums match.
+        organic_mask = result.cohort_origin == "organic"
+        viral_mask = result.cohort_origin == "viral"
+        organic_float = result.cohort_matrix[organic_mask].sum(axis=0)
+        viral_float = result.cohort_matrix[viral_mask].sum(axis=0)
+        total_float = result.cohort_matrix.sum(axis=0)
+        np.testing.assert_allclose(organic_float + viral_float, total_float, rtol=1e-12)
+
+    def test_subcritical_converges(self, default_curve, tmp_path):
+        """k well below 1 should produce a finite, non-exploding viral lineage."""
+        path = tmp_path / "installs.txt"
+        path.write_text("day\tinstalls\n1\t1000\n")  # one-shot install pulse
+        installs = load_installs(path)
+        result = simulate_with_viral(installs, default_curve, sim_days=180,
+                                      viral=ViralParams(enabled=True, k_factor=0.3,
+                                                         viral_window_days=7))
+        # Total cumulative installs should be finite and bounded.
+        # With k=0.3 and reasonable retention, the geometric series sum is small.
+        total_installs = result.new_installs.sum()
+        assert total_installs < 5000  # well under 5x the seed pulse
+        assert total_installs > 1000  # but more than just the seed
+
+    def test_viral_cohorts_tagged(self, sample_installs_file, default_curve):
+        """Viral cohorts should be tagged 'viral', organic ones 'organic'."""
+        installs = load_installs(sample_installs_file)
+        result = simulate_with_viral(installs, default_curve, sim_days=30,
+                                      viral=ViralParams(enabled=True, k_factor=0.5))
+        assert "viral" in result.cohort_origin
+        assert "organic" in result.cohort_origin
+        # Organic cohorts should equal the input install days
+        organic_days = sorted(set(result.install_days[result.cohort_origin == "organic"]))
+        assert organic_days == [1, 2, 3]
+
+    def test_sends_from_k_basic(self):
+        # k=0.3, 10% conversion → 3 sends per install
+        assert sends_from_k(0.3, 0.10) == pytest.approx(3.0)
+        # k=0.8, 5% conversion → 16 sends per install
+        assert sends_from_k(0.8, 0.05) == pytest.approx(16.0)
+        # zero/negative conversion → infinity
+        assert sends_from_k(0.5, 0.0) == float("inf")
+        assert sends_from_k(0.5, -0.1) == float("inf")
+
+    def test_k_from_sends_roundtrip(self):
+        # Inverse should round-trip
+        assert k_from_sends(sends_from_k(0.42, 0.12), 0.12) == pytest.approx(0.42)
+        # 5 sends × 15% = 0.75 k
+        assert k_from_sends(5.0, 0.15) == pytest.approx(0.75)
+
+    def test_simulate_dispatches_to_viral(self, sample_installs_file, default_curve):
+        """simulate() with viral.enabled=True should dispatch to simulate_with_viral."""
+        installs = load_installs(sample_installs_file)
+        v = ViralParams(enabled=True, k_factor=0.5)
+        a = simulate(installs, default_curve, sim_days=30, viral=v)
+        b = simulate_with_viral(installs, default_curve, sim_days=30, viral=v)
+        np.testing.assert_array_equal(a.dau, b.dau)

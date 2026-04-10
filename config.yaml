@@ -1,12 +1,13 @@
 retention:
   anchors:
   - [0, 100.0]
-  - [1, 41.0]
+  - [1, 40.0]
   - [7, 22.0]
-  - [30, 5.5]
+  - [30, 4.0]
   - [90, 1.5]
   - [180, 0.0]
 monetization: {pct_payers: 0.04, arppu: 9.5}
+viral: {enabled: true, k_factor: 0.45, viral_window_days: 7}
 economy:
   instances_per_day: 5
   coin_to_usd: 1.0

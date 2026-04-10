@@ -45,6 +45,47 @@ class RevenueResult:
             result = np.where(dau > 0, self._daily_revenue / dau, 0.0)
         return result
 
+    def _revenue_by_origin(self, origin: str) -> np.ndarray:
+        """Daily revenue allocated to cohorts of a given origin (organic/viral).
+
+        Splits each day's revenue between origins in proportion to their
+        unrounded cohort-matrix contribution to that day. Using the unrounded
+        total (rather than `sim.dau`, which is rounded) ensures
+        organic_revenue + viral_revenue == daily_revenue exactly.
+        """
+        if not hasattr(self.sim, "cohort_origin"):
+            return self._daily_revenue.copy() if origin == "organic" else np.zeros_like(self._daily_revenue)
+        mask = self.sim.cohort_origin == origin
+        if not mask.any():
+            return self._daily_revenue.copy() if origin == "organic" else np.zeros_like(self._daily_revenue)
+        # If all cohorts are of this origin, return full revenue (avoids divide-by-zero
+        # and handles the trivial single-origin case cleanly).
+        if mask.all():
+            return self._daily_revenue.copy()
+        origin_sum = self.sim.cohort_matrix[mask].sum(axis=0)
+        total_sum = self.sim.cohort_matrix.sum(axis=0)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            share = np.where(total_sum > 0, origin_sum / total_sum, 0.0)
+        return share * self._daily_revenue
+
+    @property
+    def organic_revenue(self) -> np.ndarray:
+        """Daily revenue from organic cohorts only."""
+        return self._revenue_by_origin("organic")
+
+    @property
+    def viral_revenue(self) -> np.ndarray:
+        """Daily revenue from viral cohorts only (zero if no viral cohorts)."""
+        return self._revenue_by_origin("viral")
+
+    @property
+    def organic_revenue_total(self) -> float:
+        return float(self.organic_revenue.sum())
+
+    @property
+    def viral_revenue_total(self) -> float:
+        return float(self.viral_revenue.sum())
+
     @property
     def revenue_per_cohort(self) -> np.ndarray:
         """Total revenue attributed to each install cohort over its lifetime.
